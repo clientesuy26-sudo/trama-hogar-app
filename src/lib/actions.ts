@@ -67,10 +67,12 @@ export async function sendOrderToWhatsApp(payload: OrderPayload) {
     }
 
     message += `💰 *PRESUPUESTO TOTAL: $${payload.total}*`;
+    
+    const destinationNumber = `${VENDOR_WHATSAPP_NUMBER}@c.us`;
 
     logEvent('sendOrderToWhatsApp', 'info', 'Sending request to Evolution API.', {
         url: `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`,
-        number: VENDOR_WHATSAPP_NUMBER,
+        number: destinationNumber,
     });
 
     try {
@@ -81,7 +83,7 @@ export async function sendOrderToWhatsApp(payload: OrderPayload) {
                 'apikey': EVOLUTION_API_KEY!,
             },
             body: JSON.stringify({
-                number: VENDOR_WHATSAPP_NUMBER,
+                number: destinationNumber,
                 text: message,
             }),
         });
@@ -150,7 +152,9 @@ export async function sendChatMessageToWhatsApp(text: string) {
         return { success: false, error: 'Message text is empty.' };
     }
     const fullMessage = `Consulta desde el Chat Widget: "${text}"`;
-    logEvent('sendChatMessageToWhatsApp', 'info', 'Sending chat message to WhatsApp.', { text: fullMessage });
+    const destinationNumber = `${VENDOR_WHATSAPP_NUMBER}@c.us`;
+
+    logEvent('sendChatMessageToWhatsApp', 'info', 'Sending chat message to WhatsApp.', { text: fullMessage, number: destinationNumber });
 
      try {
         const response = await fetch(`${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
@@ -160,7 +164,7 @@ export async function sendChatMessageToWhatsApp(text: string) {
                 'apikey': EVOLUTION_API_KEY!,
             },
             body: JSON.stringify({
-                number: VENDOR_WHATSAPP_NUMBER,
+                number: destinationNumber,
                 text: fullMessage,
             }),
         });

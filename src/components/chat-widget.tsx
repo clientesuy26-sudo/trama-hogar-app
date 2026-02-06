@@ -3,10 +3,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, X, SendHorizonal, LoaderCircle, Check, Circle } from 'lucide-react';
+import { Bot, X, SendHorizonal, LoaderCircle, Check, Circle, CheckCheck, Clock, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ChatMessage, EvolutionMessage } from '@/types';
-import { getAiChatResponse, sendChatMessageToWhatsApp, fetchNewWhatsAppMessages } from '@/lib/actions';
+import type { ChatMessage } from '@/types';
+import { sendChatMessageToWhatsApp, fetchNewWhatsAppMessages } from '@/lib/actions';
 import { logEvent } from '@/lib/logger';
 
 type ChatWidgetProps = {
@@ -19,10 +19,9 @@ type ChatWidgetProps = {
 export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessage }: ChatWidgetProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState('');
-    const [isTyping, setIsTyping] = useState(false);
+    const [isSending, setIsSending] = useState(false);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
     const [hasNewMessage, setHasNewMessage] = useState(false);
-    const processedMessageIds = useRef(new Set<string>());
     const isOpenRef = useRef(isOpen);
 
     useEffect(() => {
@@ -40,29 +39,12 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
         }, 100);
     }, []);
 
-    const handleNewMessages = useCallback((fetchedMessages: EvolutionMessage[]) => {
-        const newChatMessages: ChatMessage[] = [];
-        
-        fetchedMessages.slice().reverse().forEach(msg => {
-            if (!msg.key.fromMe && msg.message && !processedMessageIds.current.has(msg.key.id)) {
-                const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
-                if (text) {
-                    newChatMessages.push({
-                        id: msg.key.id,
-                        text: text,
-                        type: 'received',
-                        timestamp: msg.messageTimestamp * 1000
-                    });
-                    processedMessageIds.current.add(msg.key.id);
-                }
-            }
-        });
-
-        if (newChatMessages.length > 0) {
+    const handleNewMessages = useCallback((fetchedMessages: ChatMessage[]) => {
+        if (fetchedMessages.length > 0) {
             if (!isOpenRef.current) {
                 setHasNewMessage(true);
             }
-            setMessages(prev => [...prev, ...newChatMessages]);
+            setMessages(prev => [...prev, ...fetchedMessages]);
         }
     }, []);
     
@@ -83,80 +65,85 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
     useEffect(() => {
         if (isOpen) {
             setHasNewMessage(false);
-            const welcomeMessage: ChatMessage = {
-                id: 'welcome',
-                text: '¡Hola! Soy Maya de Trama Hogar. ¿En qué puedo ayudarte con tu presupuesto hoy? 👋',
-                type: 'received',
-                timestamp: Date.now()
-            };
-            if(messages.length === 0) {
-              setMessages([welcomeMessage]);
-              processedMessageIds.current.add(welcomeMessage.id);
+            if (messages.length === 0) {
+                 const welcomeMessage: ChatMessage = {
+                    id: 'welcome',
+                    text: '¡Hola! Soy Maya de Trama Hogar. ¿En qué puedo ayudarte con tu presupuesto hoy? 👋',
+                    sender: 'user',
+                    senderName: 'Maya',
+                    timestamp: Date.now(),
+                    status: 'delivered'
+                };
+                setMessages([welcomeMessage]);
             }
 
             if (initialMessage) {
+                const tempId = `temp_${Date.now()}`;
                 const orderMessage: ChatMessage = {
-                    id: `sent-${Date.now()}`,
+                    id: tempId,
                     text: initialMessage,
-                    type: 'sent',
-                    timestamp: Date.now()
+                    sender: 'agent',
+                    senderName: 'Tú',
+                    timestamp: Date.now(),
+                    status: 'sending'
                 };
-                processedMessageIds.current.add(orderMessage.id);
                 setMessages(prev => [...prev, orderMessage]);
-                handleAiResponse(initialMessage, [welcomeMessage, orderMessage]);
                 clearInitialMessage();
+                
+                sendChatMessageToWhatsApp(initialMessage, 'Pedido').then(result => {
+                    setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: result.success ? 'sent' : 'error', id: result.success ? result.messageId! : tempId } : m));
+                });
             }
             scrollToBottom();
         }
-    }, [isOpen, initialMessage, clearInitialMessage, handleNewMessages]);
+    }, [isOpen, initialMessage, clearInitialMessage]);
 
     useEffect(() => {
         scrollToBottom();
     }, [messages, scrollToBottom]);
 
-    const handleAiResponse = async (query: string, currentHistory: ChatMessage[]) => {
-        setIsTyping(true);
-        const historyText = currentHistory.map(m => `${m.type === 'sent' ? 'User' : 'Maya'}: ${m.text}`).join('\n');
-        const aiResponse = await getAiChatResponse(query, historyText);
-        
-        const aiMessage: ChatMessage = {
-            id: `ai-${Date.now()}`,
-            text: aiResponse,
-            type: 'received',
-            timestamp: Date.now()
-        };
-        processedMessageIds.current.add(aiMessage.id);
-        setMessages(prev => [...prev, aiMessage]);
-        setIsTyping(false);
-    };
 
     const handleSendMessage = async (e?: React.FormEvent) => {
         e?.preventDefault();
         const text = inputValue.trim();
-        if (!text) return;
+        if (!text || isSending) return;
 
+        const tempId = `temp_${Date.now()}`;
         const userMessage: ChatMessage = {
-            id: `sent-${Date.now()}`,
+            id: tempId,
             text,
-            type: 'sent',
-            timestamp: Date.now()
+            sender: 'agent',
+            senderName: 'Tú',
+            timestamp: Date.now(),
+            status: 'sending'
         };
-        processedMessageIds.current.add(userMessage.id);
 
-        const newMessages = [...messages, userMessage];
-        setMessages(newMessages);
+        setMessages(prev => [...prev, userMessage]);
         setInputValue('');
+        setIsSending(true);
 
-        logEvent('ChatWidget', 'info', 'Sending message to WhatsApp...', { text });
+        logEvent('ChatWidget', 'info', 'Sending message via n8n...', { text });
         const result = await sendChatMessageToWhatsApp(text);
+        
         if (result.success) {
-            logEvent('ChatWidget', 'success', 'Message sent to WhatsApp successfully.');
+            logEvent('ChatWidget', 'success', 'Message sent to n8n successfully.');
+            setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'sent', id: result.messageId! } : m));
         } else {
-            logEvent('ChatWidget', 'error', 'Failed to send message to WhatsApp.', { error: result.error });
+            logEvent('ChatWidget', 'error', 'Failed to send message to n8n.', { error: result.error });
+            setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'error' } : m));
         }
-
-        await handleAiResponse(text, newMessages);
+        setIsSending(false);
     };
+
+    const getStatusIcon = (status?: ChatMessage['status']) => {
+        switch (status) {
+            case 'sending': return <Clock className="h-3 w-3 text-white/70" />;
+            case 'sent': return <Check className="h-3 w-3 text-white/70" />;
+            case 'delivered': return <CheckCheck className="h-3 w-3 text-white/70" />;
+            case 'error': return <AlertTriangle className="h-3 w-3 text-red-400" />;
+            default: return null;
+        }
+    }
 
     if (!isOpen) {
         return (
@@ -195,16 +182,22 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
             <ScrollArea className="flex-1 bg-secondary/30" ref={scrollAreaRef}>
                 <div className="p-4 space-y-4">
                     {messages.map((msg) => (
-                        <div key={msg.id} className={cn("flex", msg.type === 'sent' ? 'justify-end' : 'justify-start')}>
+                        <div key={msg.id} className={cn("flex", msg.sender === 'agent' ? 'justify-end' : 'justify-start')}>
                             <div className={cn("max-w-[85%] py-2 px-3.5 text-sm rounded-2xl shadow-sm", {
-                                "bg-primary text-primary-foreground rounded-br-md": msg.type === 'sent',
-                                "bg-card text-card-foreground border rounded-bl-md": msg.type === 'received'
+                                "bg-primary text-primary-foreground rounded-br-md": msg.sender === 'agent',
+                                "bg-card text-card-foreground border rounded-bl-md": msg.sender === 'user'
                             })}>
-                                {msg.text}
+                                <p>{msg.text}</p>
+                                <div className={cn("flex items-center gap-1 mt-1", msg.sender === 'agent' ? 'justify-end' : 'justify-start')}>
+                                    <span className={cn("text-[10px]", msg.sender === 'agent' ? 'text-white/60' : 'text-muted-foreground')}>
+                                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                    {msg.sender === 'agent' && getStatusIcon(msg.status)}
+                                </div>
                             </div>
                         </div>
                     ))}
-                    {isTyping && (
+                    {isSending && (
                          <div className="flex justify-start">
                             <div className="max-w-[85%] py-2 px-3.5 text-sm rounded-2xl shadow-sm bg-card text-card-foreground border rounded-bl-md flex items-center gap-2">
                                 <Circle className="w-1.5 h-1.5 animate-pulse delay-0" />
@@ -224,9 +217,10 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
                         placeholder="Escribe tu mensaje..."
                         className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
                         autoComplete="off"
+                        disabled={isSending}
                     />
-                    <Button type="submit" size="icon" className="rounded-full w-9 h-9" disabled={!inputValue || isTyping}>
-                        {isTyping ? <LoaderCircle className="h-4 w-4 animate-spin"/> : <SendHorizonal className="h-4 w-4" />}
+                    <Button type="submit" size="icon" className="rounded-full w-9 h-9" disabled={!inputValue || isSending}>
+                        {isSending ? <LoaderCircle className="h-4 w-4 animate-spin"/> : <SendHorizonal className="h-4 w-4" />}
                     </Button>
                 </form>
             </div>

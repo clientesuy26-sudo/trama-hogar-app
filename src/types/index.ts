@@ -32,21 +32,8 @@ export interface LightboxContent {
 export interface ChatMessage {
   id: string;
   text: string;
-  type: 'sent' | 'received';
+  sender: 'user' | 'agent';
+  senderName: string;
   timestamp: number;
-}
-
-export interface EvolutionMessage {
-  key: {
-    remoteJid: string;
-    fromMe: boolean;
-    id: string;
-  };
-  message: {
-    conversation?: string;
-    extendedTextMessage?: {
-      text: string;
-    };
-  } | null;
-  messageTimestamp: number;
+  status?: 'sending' | 'sent' | 'delivered' | 'error';
 }

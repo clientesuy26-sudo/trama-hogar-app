@@ -7,7 +7,7 @@ import { products, extrasCatalog } from './data';
 import { z } from 'zod';
 import { logEvent } from './logger';
 
-const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
+const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL?.replace(/\/$/, '');
 const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE;
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
 const VENDOR_WHATSAPP_NUMBER = process.env.VENDOR_WHATSAPP_NUMBER;
@@ -36,7 +36,6 @@ const OrderPayloadSchema = z.object({
 type OrderPayload = z.infer<typeof OrderPayloadSchema>;
 
 export async function sendOrderToWhatsApp(payload: OrderPayload) {
-    logEvent('sendOrderToWhatsApp', 'info', 'Attempting to send order to WhatsApp.', payload);
     try {
         OrderPayloadSchema.parse(payload);
     } catch (error) {
@@ -70,36 +69,49 @@ export async function sendOrderToWhatsApp(payload: OrderPayload) {
     
     const destinationNumber = `${VENDOR_WHATSAPP_NUMBER}@c.us`;
     const endpoint = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
-
-    logEvent('sendOrderToWhatsApp', 'info', 'Sending request to Evolution API.', {
-        url: endpoint,
+    
+    const requestBody = {
         number: destinationNumber,
+        textMessage: { text: message },
+    };
+    const requestHeaders = {
+        'Content-Type': 'application/json',
+        'apikey': EVOLUTION_API_KEY!,
+    };
+
+    const curlCommand = `curl -X POST "${endpoint}" -H "Content-Type: application/json" -H "apikey: ${EVOLUTION_API_KEY ? '********' : 'NOT_SET'}" -d '${JSON.stringify(requestBody)}'`;
+    logEvent('sendOrderToWhatsApp', 'info', 'Preparing Evolution API request for order.', {
+        endpoint,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'apikey': EVOLUTION_API_KEY ? '******' : 'NOT SET',
+        },
+        body: requestBody,
+        curl_equivalent: curlCommand
     });
+
 
     try {
         const response = await fetch(endpoint, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': EVOLUTION_API_KEY!,
-            },
-            body: JSON.stringify({
-                number: destinationNumber,
-                textMessage: { text: message },
-            }),
+            headers: requestHeaders,
+            body: JSON.stringify(requestBody),
         });
 
         if (response.ok) {
-            logEvent('sendOrderToWhatsApp', 'success', 'Order sent successfully via Evolution API.');
+            const responseData = await response.json().catch(() => ({}));
+            logEvent('sendOrderToWhatsApp', 'success', 'Order sent successfully via Evolution API.', { status: response.status, response: responseData });
             return { success: true, message: "Order sent successfully." };
         } else {
-            const errorData = await response.json();
-            logEvent('sendOrderToWhatsApp', 'error', 'Evolution API Error.', { status: response.status, errorData });
+            const errorData = await response.json().catch(() => ({ message: 'Could not parse error response as JSON.' }));
+            const errorMessage = errorData?.message || JSON.stringify(errorData) || 'Unknown API error';
+            logEvent('sendOrderToWhatsApp', 'error', 'Evolution API Error sending order.', { status: response.status, error: errorData });
             console.error("Evolution API Error:", errorData);
-            return { success: false, error: "Failed to send order via API." };
+            return { success: false, error: `API Error: ${errorMessage}` };
         }
-    } catch (error) {
-        logEvent('sendOrderToWhatsApp', 'error', 'Fetch error while contacting Evolution API.', error);
+    } catch (error: any) {
+        logEvent('sendOrderToWhatsApp', 'error', 'Network/Fetch error while contacting Evolution API.', { name: error.name, message: error.message, cause: error.cause });
         console.error("Fetch Error:", error);
         return { success: false, error: "Network error or API is down." };
     }
@@ -152,37 +164,51 @@ export async function sendChatMessageToWhatsApp(text: string): Promise<{ success
         logEvent('sendChatMessageToWhatsApp', 'error', 'Message text is empty.');
         return { success: false, error: 'Message text is empty.' };
     }
+    
     const fullMessage = `Consulta desde el Chat Widget: "${text}"`;
     const destinationNumber = `${VENDOR_WHATSAPP_NUMBER}@c.us`;
     const endpoint = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
+    const requestBody = {
+        number: destinationNumber,
+        textMessage: { text: fullMessage },
+    };
+    const requestHeaders = {
+        'Content-Type': 'application/json',
+        'apikey': EVOLUTION_API_KEY!,
+    };
 
-    logEvent('sendChatMessageToWhatsApp', 'info', 'Sending chat message to WhatsApp.', { text: fullMessage, number: destinationNumber, url: endpoint });
+    const curlCommand = `curl -X POST "${endpoint}" -H "Content-Type: application/json" -H "apikey: ${EVOLUTION_API_KEY ? '********' : 'NOT_SET'}" -d '${JSON.stringify(requestBody)}'`;
+    logEvent('sendChatMessageToWhatsApp', 'info', 'Preparing Evolution API request.', {
+        endpoint,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'apikey': EVOLUTION_API_KEY ? '******' : 'NOT SET',
+        },
+        body: requestBody,
+        curl_equivalent: curlCommand
+    });
 
      try {
         const response = await fetch(endpoint, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': EVOLUTION_API_KEY!,
-            },
-            body: JSON.stringify({
-                number: destinationNumber,
-                textMessage: { text: fullMessage },
-            }),
+            headers: requestHeaders,
+            body: JSON.stringify(requestBody),
         });
         
         if (response.ok) {
-            logEvent('sendChatMessageToWhatsApp', 'success', 'Chat message sent successfully.');
+            const responseData = await response.json().catch(() => ({}));
+            logEvent('sendChatMessageToWhatsApp', 'success', 'Chat message sent successfully.', { status: response.status, response: responseData });
             return { success: true };
         } else {
-            const errorData = await response.json();
-            const errorMessage = errorData?.message || 'Unknown API error';
-            logEvent('sendChatMessageToWhatsApp', 'error', 'Error sending chat message.', { status: response.status, errorData });
+            const errorData = await response.json().catch(() => ({ message: 'Could not parse error response as JSON.' }));
+            const errorMessage = errorData?.message || JSON.stringify(errorData) ||'Unknown API error';
+            logEvent('sendChatMessageToWhatsApp', 'error', 'Failed to send chat message.', { status: response.status, error: errorData });
             return { success: false, error: `API Error: ${errorMessage}` };
         }
         
     } catch (error: any) {
-        logEvent('sendChatMessageToWhatsApp', 'error', 'Fetch error sending chat message.', error);
+        logEvent('sendChatMessageToWhatsApp', 'error', 'Network/Fetch error sending chat message.', { name: error.name, message: error.message, cause: error.cause });
         console.error("Error sending chat message:", error);
         return { success: false, error: `Network Error: ${error.message || 'Unknown error'}` };
     }

@@ -88,10 +88,6 @@ export async function sendOrderToWhatsApp(payload: OrderPayload) {
     
     const requestBody = {
         number: destinationNumber,
-        options: {
-          delay: 1200,
-          presence: "composing",
-        },
         textMessage: {
             text: message,
         }
@@ -192,10 +188,6 @@ export async function sendChatMessageToWhatsApp(text: string): Promise<{ success
     const endpoint = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
     const requestBody = {
         number: destinationNumber,
-        options: {
-          delay: 1200,
-          presence: "composing",
-        },
         textMessage: {
             text: fullMessage,
         }

@@ -3,11 +3,22 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, X, SendHorizonal, LoaderCircle, Check, Circle, CheckCheck, Clock, AlertTriangle } from 'lucide-react';
+import { Bot, X, SendHorizonal, LoaderCircle, Check, Circle, CheckCheck, Clock, AlertTriangle, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ChatMessage } from '@/types';
 import { sendChatMessageToWhatsApp, fetchNewWhatsAppMessages } from '@/lib/actions';
 import { logEvent } from '@/lib/logger';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+
+const CustomerInfoSchema = z.object({
+  name: z.string().min(2, { message: 'El nombre es requerido.' }),
+  whatsapp: z.string().regex(/^(?:\+?598)?(09\d{7}|\d{8})$/, { message: 'Ingresa un WhatsApp válido de Uruguay (ej: 099123456).' }),
+  barrio: z.string().min(3, { message: 'El barrio es requerido.' }),
+});
+type CustomerInfo = z.infer<typeof CustomerInfoSchema>;
 
 type ChatWidgetProps = {
     isOpen: boolean;
@@ -23,6 +34,15 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
     const scrollAreaRef = useRef<HTMLDivElement>(null);
     const [hasNewMessage, setHasNewMessage] = useState(false);
     const isOpenRef = useRef(isOpen);
+
+    const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
+    const [isCollectingInfo, setIsCollectingInfo] = useState(false);
+
+    const form = useForm<CustomerInfo>({
+        resolver: zodResolver(CustomerInfoSchema),
+        defaultValues: { name: '', whatsapp: '', barrio: '' },
+        mode: 'onChange',
+    });
 
     useEffect(() => {
         isOpenRef.current = isOpen;
@@ -55,17 +75,33 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
                 handleNewMessages(result.messages);
             }
         };
-
         const intervalId = setInterval(poll, 5000);
-        poll(); // Initial poll
-
+        poll(); 
         return () => clearInterval(intervalId);
     }, [handleNewMessages]);
 
     useEffect(() => {
         if (isOpen) {
             setHasNewMessage(false);
-            if (messages.length === 0) {
+            
+            let savedInfo: CustomerInfo | null = null;
+            try {
+                const savedInfoRaw = localStorage.getItem('tramaHogarCustomerInfo');
+                if (savedInfoRaw) {
+                    savedInfo = CustomerInfoSchema.parse(JSON.parse(savedInfoRaw));
+                }
+            } catch (e) {
+                localStorage.removeItem('tramaHogarCustomerInfo');
+            }
+
+            if (savedInfo) {
+                if(!customerInfo) setCustomerInfo(savedInfo);
+                setIsCollectingInfo(false);
+            } else {
+                setIsCollectingInfo(true);
+            }
+
+            if (messages.length === 0 && !isCollectingInfo) {
                  const welcomeMessage: ChatMessage = {
                     id: 'welcome',
                     text: '¡Hola! Soy Maya de Trama Hogar. ¿En qué puedo ayudarte con tu presupuesto hoy? 👋',
@@ -106,7 +142,7 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
     const handleSendMessage = async (e?: React.FormEvent) => {
         e?.preventDefault();
         const text = inputValue.trim();
-        if (!text || isSending) return;
+        if (!text || isSending || !customerInfo) return;
 
         const tempId = `temp_${Date.now()}`;
         const userMessage: ChatMessage = {
@@ -123,7 +159,7 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
         setIsSending(true);
 
         logEvent('ChatWidget', 'info', 'Sending message via n8n...', { text });
-        const result = await sendChatMessageToWhatsApp(text);
+        const result = await sendChatMessageToWhatsApp(text, customerInfo.name, customerInfo);
         
         if (result.success) {
             logEvent('ChatWidget', 'success', 'Message sent to n8n successfully.');
@@ -133,6 +169,23 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
             setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'error' } : m));
         }
         setIsSending(false);
+    };
+
+    const handleInfoSubmit = (data: CustomerInfo) => {
+        logEvent('ChatWidget', 'info', 'Customer info collected.', data);
+        localStorage.setItem('tramaHogarCustomerInfo', JSON.stringify(data));
+        setCustomerInfo(data);
+        setIsCollectingInfo(false);
+        setMessages([
+            {
+                id: 'welcome-info',
+                text: `¡Genial! Gracias, ${data.name}. Ahora puedes escribir tu consulta.`,
+                sender: 'user',
+                senderName: 'Maya',
+                timestamp: Date.now(),
+                status: 'delivered'
+            }
+        ]);
     };
 
     const getStatusIcon = (status?: ChatMessage['status']) => {
@@ -187,7 +240,7 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
                                 "bg-primary text-primary-foreground rounded-br-md": msg.sender === 'agent',
                                 "bg-card text-card-foreground border rounded-bl-md": msg.sender === 'user'
                             })}>
-                                <p>{msg.text}</p>
+                                <p className="whitespace-pre-wrap">{msg.text}</p>
                                 <div className={cn("flex items-center gap-1 mt-1", msg.sender === 'agent' ? 'justify-end' : 'justify-start')}>
                                     <span className={cn("text-[10px]", msg.sender === 'agent' ? 'text-white/60' : 'text-muted-foreground')}>
                                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -208,21 +261,72 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
                     )}
                 </div>
             </ScrollArea>
-            <div className="p-4 border-t bg-card">
-                <form onSubmit={handleSendMessage} className="flex gap-2 bg-secondary/50 rounded-full px-2 py-1 items-center">
-                    <Input
-                        id="chat-input"
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        placeholder="Escribe tu mensaje..."
-                        className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
-                        autoComplete="off"
-                        disabled={isSending}
-                    />
-                    <Button type="submit" size="icon" className="rounded-full w-9 h-9" disabled={!inputValue || isSending}>
-                        {isSending ? <LoaderCircle className="h-4 w-4 animate-spin"/> : <SendHorizonal className="h-4 w-4" />}
-                    </Button>
-                </form>
+             <div className="p-4 border-t bg-card">
+                {isCollectingInfo ? (
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(handleInfoSubmit)} className="space-y-3">
+                            <p className="text-center text-xs font-bold text-muted-foreground uppercase tracking-wider">Antes de empezar, necesitamos unos datos</p>
+                             <FormField
+                                control={form.control}
+                                name="name"
+                                render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="sr-only">Nombre</FormLabel>
+                                    <FormControl>
+                                    <Input placeholder="Nombre y Apellido" {...field} className="bg-secondary/50 h-9"/>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="whatsapp"
+                                render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="sr-only">WhatsApp</FormLabel>
+                                    <FormControl>
+                                    <Input type="tel" placeholder="N° de WhatsApp (ej: 099123456)" {...field} className="bg-secondary/50 h-9"/>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="barrio"
+                                render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="sr-only">Barrio</FormLabel>
+                                    <FormControl>
+                                    <Input placeholder="Barrio" {...field} className="bg-secondary/50 h-9"/>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                            <Button type="submit" className="w-full" disabled={!form.formState.isValid}>
+                                <User className="mr-2 h-4 w-4"/>
+                                Guardar y Continuar
+                            </Button>
+                        </form>
+                    </Form>
+                ) : (
+                    <form onSubmit={handleSendMessage} className="flex gap-2 bg-secondary/50 rounded-full px-2 py-1 items-center">
+                        <Input
+                            id="chat-input"
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            placeholder="Escribe tu mensaje..."
+                            className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
+                            autoComplete="off"
+                            disabled={isSending}
+                        />
+                        <Button type="submit" size="icon" className="rounded-full w-9 h-9" disabled={!inputValue || isSending}>
+                            {isSending ? <LoaderCircle className="h-4 w-4 animate-spin"/> : <SendHorizonal className="h-4 w-4" />}
+                        </Button>
+                    </form>
+                )}
             </div>
         </div>
     );

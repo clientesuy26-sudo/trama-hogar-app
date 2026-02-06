@@ -135,6 +135,7 @@ export function PurchaseModal({ isOpen, onClose, product, onOpenLightbox, onSend
     
     if (result.success) {
       logEvent('PurchaseModal', 'success', 'Order sent successfully.', payload);
+      localStorage.setItem('tramaHogarCustomerInfo', JSON.stringify(payload.customerInfo));
       const orderMessage = result.orderMessage || `He realizado un pedido de presupuesto para: ${mainQty}x ${product.name}. Total: $${totalPrice}.`;
       onSendOrder(orderMessage);
       toast({ title: "Pedido enviado", description: "Tu presupuesto ha sido enviado a Maya. Revisa el chat." });

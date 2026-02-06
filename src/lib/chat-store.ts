@@ -1,5 +1,6 @@
 import { kv } from '@vercel/kv';
 import type { ChatMessage } from '@/types';
+import { logEvent } from './logger';
 
 // This is a unique key for this specific chat session.
 // In a real multi-user app, you'd generate a unique ID per conversation.
@@ -12,6 +13,7 @@ const CONVERSATION_KEY = 'whatsapp_chat_messages';
 export const addMessage = async (message: ChatMessage): Promise<void> => {
     // LPUSH adds the message to the head of the list in Redis.
     await kv.lpush(CONVERSATION_KEY, message);
+    logEvent('ChatStore', 'success', 'Message added to Vercel KV.', { message });
 };
 
 /**
@@ -31,6 +33,7 @@ export const getAndClearMessages = async (): Promise<ChatMessage[]> => {
     const [messages, _] = await pipe.exec<[ChatMessage[], number]>();
     
     if (messages && messages.length > 0) {
+      logEvent('ChatStore', 'info', `Retrieved and cleared ${messages.length} messages from Vercel KV.`);
       // LPUSH adds to the head, so the list is in reverse chronological order.
       // We reverse it back to get the correct chronological order for the chat.
       return messages.reverse();

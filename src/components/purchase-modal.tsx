@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,11 @@ import { X, Truck, Store, Bot, LoaderCircle, ZoomIn } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { logEvent } from '@/lib/logger';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 
 type PurchaseModalProps = {
   isOpen: boolean;
@@ -23,6 +28,13 @@ type PurchaseModalProps = {
   onSendOrder: (message: string) => void;
 };
 
+const FormSchema = z.object({
+  name: z.string().min(2, { message: 'El nombre es requerido.' }),
+  whatsapp: z.string().regex(/^\d{8,12}$/, { message: 'Ingresa un WhatsApp válido (solo números, entre 8 y 12 dígitos).' }),
+  barrio: z.string().min(3, { message: 'El barrio es requerido.' }),
+});
+
+
 export function PurchaseModal({ isOpen, onClose, product, onOpenLightbox, onSendOrder }: PurchaseModalProps) {
   const [mainQty, setMainQty] = useState(2);
   const [extras, setExtras] = useState<Record<string, number>>({});
@@ -30,6 +42,16 @@ export function PurchaseModal({ isOpen, onClose, product, onOpenLightbox, onSend
   const [suggestedItems, setSuggestedItems] = useState<Extra[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+
+  const form = useForm<z.infer<typeof FormSchema>>({
+    resolver: zodResolver(FormSchema),
+    defaultValues: {
+      name: '',
+      whatsapp: '',
+      barrio: '',
+    },
+    mode: 'onChange',
+  });
 
   const allPossibleExtras = useMemo(() => {
     const otherProductsAsExtras: Extra[] = products
@@ -52,6 +74,7 @@ export function PurchaseModal({ isOpen, onClose, product, onOpenLightbox, onSend
       setExtras({});
       setShippingMethod(null);
       setSuggestedItems([]);
+      form.reset();
       
       const fetchSuggestions = async () => {
         const items = await getAiSuggestions(product);
@@ -59,7 +82,7 @@ export function PurchaseModal({ isOpen, onClose, product, onOpenLightbox, onSend
       };
       fetchSuggestions();
     }
-  }, [isOpen, product]);
+  }, [isOpen, product, form]);
 
   const mainPrice = getTieredPrice(mainQty);
   
@@ -84,7 +107,7 @@ export function PurchaseModal({ isOpen, onClose, product, onOpenLightbox, onSend
     }));
   };
 
-  const handleSendOrder = async () => {
+  const handleSendOrder = async (data: z.infer<typeof FormSchema>) => {
     if (!shippingMethod) return;
     setIsLoading(true);
 
@@ -99,7 +122,12 @@ export function PurchaseModal({ isOpen, onClose, product, onOpenLightbox, onSend
       mainItem: { name: product.name, img: product.img, quantity: mainQty, subtotal: mainPrice },
       extraItems: extraItemsPayload,
       shipping: { method: shippingMethod, cost: shippingCost },
-      total: totalPrice
+      total: totalPrice,
+      customerInfo: {
+          name: data.name,
+          whatsapp: data.whatsapp,
+          barrio: data.barrio,
+      }
     };
     
     logEvent('PurchaseModal', 'info', 'Attempting to send order.', payload);
@@ -134,78 +162,125 @@ export function PurchaseModal({ isOpen, onClose, product, onOpenLightbox, onSend
             <X className="h-4 w-4" />
           </Button>
         </DialogHeader>
-
-        <ScrollArea className="max-h-[60vh]">
-          <div className="p-6">
-            <div className="flex flex-col sm:flex-row gap-6 mb-6 pb-6 border-b">
-              <div className="relative group cursor-zoom-in self-start flex-shrink-0" onClick={() => onOpenLightbox({ src: product.img, type: 'image' })}>
-                <Image src={product.img} alt={product.name} width={128} height={128} data-ai-hint={product.imageHint} className="w-32 h-32 object-cover rounded-xl shadow-md border-2 bg-white" />
-                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-xl transition-opacity">
-                  <ZoomIn className="text-white" />
-                </div>
-              </div>
-              <div className="flex-1">
-                <h4 className="font-black text-xl mb-2 uppercase tracking-tighter">{product.name}</h4>
-                <p className="text-xs text-muted-foreground mb-4 uppercase font-bold tracking-widest">Cantidad principal</p>
-                <div className="flex flex-wrap items-center justify-between gap-4 bg-secondary p-3 rounded-2xl">
-                  <div className="flex items-center border-2 rounded-full bg-background overflow-hidden h-12 shadow-inner">
-                    <Button variant="ghost" size="icon" className="w-10 h-full rounded-none text-xl font-black" onClick={() => updateMainQty(-1)}>-</Button>
-                    <input value={mainQty} type="number" readOnly className="w-14 text-center border-none focus:ring-0 bg-transparent font-black text-lg" />
-                    <Button variant="ghost" size="icon" className="w-10 h-full rounded-none text-xl font-black" onClick={() => updateMainQty(1)}>+</Button>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[10px] text-muted-foreground font-bold uppercase">Subtotal</div>
-                    <span className="font-black text-primary text-2xl tracking-tighter">${mainPrice}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 mb-6">
-                <h5 className="font-black text-sm uppercase tracking-widest">Artículos que tal vez quieras agregar</h5>
-              </div>
-              <div className="flex flex-col gap-4">
-                {displayedExtras.map(item => (
-                  <SuggestionItem 
-                    key={item.id} 
-                    item={item} 
-                    quantity={extras[item.id] || 0} 
-                    onQuantityChange={updateExtraQty}
-                    onOpenLightbox={onOpenLightbox}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </ScrollArea>
         
-        <div className="p-6 bg-secondary/50 border-t">
-          <div className="flex justify-between items-end mb-4">
-            <div>
-              <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">Total del presupuesto</span>
-              <div className="font-black text-4xl text-foreground tracking-tighter">${totalPrice}</div>
-            </div>
-            {shippingMethod === 'envio' && (
-              <div className="text-right text-[10px] text-muted-foreground font-bold uppercase">
-                + Envío ${shippingCost} incluido
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSendOrder)} className="flex flex-col max-h-[85vh]">
+            <ScrollArea className="flex-1">
+              <div className="p-6">
+                <div className="flex flex-col sm:flex-row gap-6 mb-6 pb-6 border-b">
+                  <div className="relative group cursor-zoom-in self-start flex-shrink-0" onClick={() => onOpenLightbox({ src: product.img, type: 'image' })}>
+                    <Image src={product.img} alt={product.name} width={128} height={128} data-ai-hint={product.imageHint} className="w-32 h-32 object-cover rounded-xl shadow-md border-2 bg-white" />
+                    <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-xl transition-opacity">
+                      <ZoomIn className="text-white" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-black text-xl mb-2 uppercase tracking-tighter">{product.name}</h4>
+                    <p className="text-xs text-muted-foreground mb-4 uppercase font-bold tracking-widest">Cantidad principal</p>
+                    <div className="flex flex-wrap items-center justify-between gap-4 bg-secondary p-3 rounded-2xl">
+                      <div className="flex items-center border-2 rounded-full bg-background overflow-hidden h-12 shadow-inner">
+                        <Button variant="ghost" size="icon" className="w-10 h-full rounded-none text-xl font-black" onClick={() => updateMainQty(-1)}>-</Button>
+                        <input value={mainQty} type="number" readOnly className="w-14 text-center border-none focus:ring-0 bg-transparent font-black text-lg" />
+                        <Button variant="ghost" size="icon" className="w-10 h-full rounded-none text-xl font-black" onClick={() => updateMainQty(1)}>+</Button>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] text-muted-foreground font-bold uppercase">Subtotal</div>
+                        <span className="font-black text-primary text-2xl tracking-tighter">${mainPrice}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-6">
+                    <h5 className="font-black text-sm uppercase tracking-widest">Artículos que tal vez quieras agregar</h5>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    {displayedExtras.map(item => (
+                      <SuggestionItem 
+                        key={item.id} 
+                        item={item} 
+                        quantity={extras[item.id] || 0} 
+                        onQuantityChange={updateExtraQty}
+                        onOpenLightbox={onOpenLightbox}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <Button id="btn-envio" onClick={() => setShippingMethod('envio')} variant="outline" className={cn("py-3 h-auto border-2 rounded-xl text-xs font-bold uppercase transition-all flex flex-col items-center justify-center gap-1", shippingMethod === 'envio' && 'border-primary bg-primary/10 text-primary')}>
-              <Truck className="h-5 w-5 mb-1" />
-              <span>Solicito Envío (+${250})</span>
-            </Button>
-            <Button id="btn-retiro" onClick={() => setShippingMethod('retiro')} variant="outline" className={cn("py-3 h-auto border-2 rounded-xl text-xs font-bold uppercase transition-all flex flex-col items-center justify-center gap-1", shippingMethod === 'retiro' && 'border-primary bg-primary/10 text-primary')}>
-              <Store className="h-5 w-5 mb-1" />
-              <span>Retirar en Local</span>
-            </Button>
-          </div>
-          <Button id="send-order-btn" onClick={handleSendOrder} disabled={!shippingMethod || isLoading} className="w-full h-16 rounded-full shadow-xl transition-all text-sm font-black uppercase tracking-widest">
-            {isLoading ? <LoaderCircle className="animate-spin" /> : <><span>Enviar pedido a Maya</span><Bot /></>}
-          </Button>
-        </div>
+            </ScrollArea>
+            
+            <div className="p-6 bg-secondary/50 border-t">
+               <div className="space-y-3 mb-4">
+                 <h5 className="font-black text-sm uppercase tracking-widest text-center">Tus Datos para el Pedido</h5>
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="sr-only">Nombre</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nombre y Apellido" {...field} className="bg-background"/>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="whatsapp"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="sr-only">WhatsApp</FormLabel>
+                        <FormControl>
+                          <Input type="tel" placeholder="N° de WhatsApp (ej: 099123456)" {...field} className="bg-background"/>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                   <FormField
+                    control={form.control}
+                    name="barrio"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="sr-only">Barrio</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Barrio para el envío" {...field} className="bg-background"/>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+               </div>
+              <Separator className="my-4 bg-border/50" />
+              <div className="flex justify-between items-end mb-4">
+                <div>
+                  <span className="text-muted-foreground text-[10px] font-bold uppercase tracking-widest">Total del presupuesto</span>
+                  <div className="font-black text-4xl text-foreground tracking-tighter">${totalPrice}</div>
+                </div>
+                {shippingMethod === 'envio' && (
+                  <div className="text-right text-[10px] text-muted-foreground font-bold uppercase">
+                    + Envío ${shippingCost} incluido
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <Button id="btn-envio" type="button" onClick={() => setShippingMethod('envio')} variant="outline" className={cn("py-3 h-auto border-2 rounded-xl text-xs font-bold uppercase transition-all flex flex-col items-center justify-center gap-1", shippingMethod === 'envio' && 'border-primary bg-primary/10 text-primary')}>
+                  <Truck className="h-5 w-5 mb-1" />
+                  <span>Solicito Envío (+${250})</span>
+                </Button>
+                <Button id="btn-retiro" type="button" onClick={() => setShippingMethod('retiro')} variant="outline" className={cn("py-3 h-auto border-2 rounded-xl text-xs font-bold uppercase transition-all flex flex-col items-center justify-center gap-1", shippingMethod === 'retiro' && 'border-primary bg-primary/10 text-primary')}>
+                  <Store className="h-5 w-5 mb-1" />
+                  <span>Retirar en Local</span>
+                </Button>
+              </div>
+              <Button id="send-order-btn" type="submit" disabled={!shippingMethod || isLoading || !form.formState.isValid} className="w-full h-16 rounded-full shadow-xl transition-all text-sm font-black uppercase tracking-widest">
+                {isLoading ? <LoaderCircle className="animate-spin" /> : <><span>Enviar pedido a Maya</span><Bot /></>}
+              </Button>
+            </div>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

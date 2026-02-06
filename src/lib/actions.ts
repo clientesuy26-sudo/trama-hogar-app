@@ -30,6 +30,11 @@ const OrderPayloadSchema = z.object({
         cost: z.number(),
     }),
     total: z.number(),
+    customerInfo: z.object({
+        name: z.string(),
+        whatsapp: z.string(),
+        barrio: z.string(),
+    }),
 });
 
 type OrderPayload = z.infer<typeof OrderPayloadSchema>;
@@ -43,7 +48,15 @@ export async function sendOrderToWhatsApp(payload: OrderPayload) {
         return { success: false, error: "Invalid data provided." };
     }
 
+    const { customerInfo } = payload;
+
     let message = `*¡Hola Trama Hogar!* 👋\nNuevo pedido de presupuesto:\n\n`;
+
+    message += `👤 *DATOS DEL CLIENTE:*\n`;
+    message += `↳ Nombre: ${customerInfo.name}\n`;
+    message += `↳ WhatsApp: ${customerInfo.whatsapp}\n`;
+    message += `↳ Barrio: ${customerInfo.barrio}\n\n`;
+
     message += `🧵 *ITEM PRINCIPAL:*\n`;
     message += `↳ *${payload.mainItem.name}*\n`;
     message += `↳ Cantidad: ${payload.mainItem.quantity}\n`;
@@ -66,7 +79,7 @@ export async function sendOrderToWhatsApp(payload: OrderPayload) {
 
     message += `💰 *PRESUPUESTO TOTAL: $${payload.total}*`;
     
-    return await sendChatMessageToWhatsApp(message, 'Pedido de Presupuesto');
+    return await sendChatMessageToWhatsApp(message, 'Pedido de Presupuesto', customerInfo);
 }
 
 export async function getAiSuggestions(product: Product): Promise<Extra[]> {
@@ -111,7 +124,7 @@ export async function getAiChatResponse(query: string, fullHistory: string): Pro
     }
 }
 
-export async function sendChatMessageToWhatsApp(text: string, senderName: string = 'Cliente') {
+export async function sendChatMessageToWhatsApp(text: string, senderName: string = 'Cliente', customerInfo?: {name: string, whatsapp: string, barrio: string}) {
     if (!N8N_SEND_WEBHOOK_URL || !VENDOR_WHATSAPP_NUMBER) {
       const errorMsg = 'N8N webhook URL or Vendor WhatsApp number is not configured in .env';
       logEvent('sendChatMessageToWhatsApp', 'error', errorMsg);
@@ -119,11 +132,16 @@ export async function sendChatMessageToWhatsApp(text: string, senderName: string
       return { success: false, error: errorMsg };
     }
 
-    const payload = {
+    const payload: any = {
       phoneNumber: VENDOR_WHATSAPP_NUMBER,
       text: text,
       senderName: senderName,
     };
+
+    if (customerInfo) {
+      payload.customerInfo = customerInfo;
+    }
+
     logEvent('sendChatMessageToWhatsApp', 'info', 'Sending message via n8n', { url: N8N_SEND_WEBHOOK_URL, payload });
 
     try {

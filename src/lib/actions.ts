@@ -72,7 +72,7 @@ export async function sendOrderToWhatsApp(payload: OrderPayload) {
     
     const requestBody = {
         number: destinationNumber,
-        textMessage: { text: message },
+        text: message,
     };
     const requestHeaders = {
         'Content-Type': 'application/json',
@@ -170,7 +170,7 @@ export async function sendChatMessageToWhatsApp(text: string): Promise<{ success
     const endpoint = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
     const requestBody = {
         number: destinationNumber,
-        textMessage: { text: fullMessage },
+        text: fullMessage,
     };
     const requestHeaders = {
         'Content-Type': 'application/json',

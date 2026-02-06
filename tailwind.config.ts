@@ -10,9 +10,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
-        code: ['monospace'],
+        body: ['"PT Sans"', 'sans-serif'],
+        headline: ['"Playfair Display"', 'serif'],
       },
       colors: {
         background: 'hsl(var(--background))',
@@ -70,6 +69,8 @@ export default {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        'xl': "1.5rem",
+        '2xl': "2rem",
       },
       keyframes: {
         'accordion-down': {

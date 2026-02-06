@@ -1,3 +1,88 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-video",
+      "description": "Video of a well-decorated table setting.",
+      "imageUrl": "https://goods-vod.kwcdn.com/goods-video/14931c92c00029942c99836ebe41d958029f2f9c.f30.mp4",
+      "imageHint": "table setting"
+    },
+    {
+      "id": "product-1",
+      "description": "Individual Trama Natural",
+      "imageUrl": "https://images.unsplash.com/photo-1758810744028-689670b0877c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxwbGFjZW1hdCUyMG5hdHVyYWx8ZW58MHx8fHwxNzcwMzgzNTY2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "placemat natural"
+    },
+    {
+      "id": "product-2",
+      "description": "Servilletas Estampa",
+      "imageUrl": "https://images.unsplash.com/photo-1766002156650-6e18ef2acbef?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxwYXR0ZXJuZWQlMjBuYXBraW5zfGVufDB8fHx8MTc3MDM4MzU2Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "patterned napkins"
+    },
+    {
+      "id": "product-3",
+      "description": "Cesta Panera Soft",
+      "imageUrl": "https://images.unsplash.com/photo-1615668995333-037097ec124e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8YnJlYWQlMjBiYXNrZXR8ZW58MHx8fHwxNzcwMzgzNTY2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "bread basket"
+    },
+    {
+      "id": "product-4",
+      "description": "Individual Gris Nórdico",
+      "imageUrl": "https://picsum.photos/seed/prod4/600/600",
+      "imageHint": "grey placemat"
+    },
+    {
+      "id": "product-5",
+      "description": "Set Cocina Rustik",
+      "imageUrl": "https://images.unsplash.com/photo-1484154218962-a197022b5858?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxraXRjaGVuJTIwc2V0fGVufDB8fHx8MTc3MDM4MzU2Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "kitchen set"
+    },
+    {
+      "id": "product-6",
+      "description": "Servilleta Bordado",
+      "imageUrl": "https://images.unsplash.com/photo-1762083589001-eb5591b3fb17?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxlbWJyb2lkZXJlZCUyMG5hcGtpbnxlbnwwfHx8fDE3NzAzODM1NjV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "embroidered napkin"
+    },
+    {
+      "id": "product-7",
+      "description": "Centro de Mesa Sol",
+      "imageUrl": "https://images.unsplash.com/photo-1676853963956-0309922ebca1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx0YWJsZSUyMGNlbnRlcnBpZWNlfGVufDB8fHx8MTc3MDM4MzU2Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "table centerpiece"
+    },
+    {
+      "id": "product-8",
+      "description": "Portacubiertos Deco",
+      "imageUrl": "https://images.unsplash.com/photo-1540487800723-f47a69acdf68?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8Y3V0bGVyeSUyMGhvbGRlcnxlbnwwfHx8fDE3NzAzODM1NjZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cutlery holder"
+    },
+    {
+      "id": "product-9",
+      "description": "Camino Costa",
+      "imageUrl": "https://images.unsplash.com/photo-1661817216639-b6ff5644e2f7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHx0YWJsZSUyMHJ1bm5lcnxlbnwwfHx8fDE3NzAzODM1NjZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "table runner"
+    },
+    {
+      "id": "extra-1",
+      "description": "Anillos para servilletas (8p)",
+      "imageUrl": "https://images.unsplash.com/photo-1759433582221-559c06d6e236?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxuYXBraW4lMjByaW5nc3xlbnwwfHx8fDE3NzAzODM1NjZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "napkin rings"
+    },
+    {
+      "id": "extra-2",
+      "description": "Pegatinas 'Gracias' (500p)",
+      "imageUrl": "https://images.unsplash.com/photo-1603226301024-e8461eb82e35?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHx0aGFuayUyMHlvdSUyMHN0aWNrZXJzfGVufDB8fHx8MTc3MDM4MzU2Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "thank you stickers"
+    },
+    {
+      "id": "extra-3",
+      "description": "Pétalos de rosa (1008p)",
+      "imageUrl": "https://images.unsplash.com/photo-1585768750637-ada36319a484?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxyb3NlJTIwcGV0YWxzfGVufDB8fHx8MTc3MDM4MzU2Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "rose petals"
+    },
+    {
+      "id": "extra-4",
+      "description": "Cinta de Raso Decorativa",
+      "imageUrl": "https://images.unsplash.com/photo-1719936319623-f6abc9df620c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxzYXRpbiUyMHJpYmJvbnxlbnwwfHx8fDE3NzAzODM1NjZ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "satin ribbon"
+    }
+  ]
 }

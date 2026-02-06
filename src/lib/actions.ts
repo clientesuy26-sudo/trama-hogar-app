@@ -1,0 +1,150 @@
+'use server';
+
+import { suggestComplementaryItems } from '@/ai/flows/suggest-complementary-items';
+import { aiChatAssistance } from '@/ai/flows/ai-chat-assistance';
+import type { Product, Extra, CartItem } from '@/types';
+import { products, extrasCatalog } from './data';
+import { z } from 'zod';
+
+const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
+const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE;
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
+const VENDOR_WHATSAPP_NUMBER = process.env.VENDOR_WHATSAPP_NUMBER;
+
+// Schema for order payload
+const OrderPayloadSchema = z.object({
+    mainItem: z.object({
+        name: z.string(),
+        img: z.string().url(),
+        quantity: z.number().min(1),
+        subtotal: z.number(),
+    }),
+    extraItems: z.array(z.object({
+        name: z.string(),
+        img: z.string().url(),
+        quantity: z.number().min(1),
+        total: z.number(),
+    })),
+    shipping: z.object({
+        method: z.enum(['envio', 'retiro']),
+        cost: z.number(),
+    }),
+    total: z.number(),
+});
+
+type OrderPayload = z.infer<typeof OrderPayloadSchema>;
+
+export async function sendOrderToWhatsApp(payload: OrderPayload) {
+    try {
+        OrderPayloadSchema.parse(payload);
+    } catch (error) {
+        console.error("Invalid order payload:", error);
+        return { success: false, error: "Invalid data provided." };
+    }
+
+    let message = `*¡Hola Trama Hogar!* 👋\nNuevo pedido de presupuesto:\n\n`;
+    message += `🧵 *ITEM PRINCIPAL:*\n`;
+    message += `↳ *${payload.mainItem.name}*\n`;
+    message += `↳ Cantidad: ${payload.mainItem.quantity}\n`;
+    message += `↳ Subtotal: $${payload.mainItem.subtotal}\n\n`;
+
+    if (payload.extraItems.length > 0) {
+        message += `✨ *ARTÍCULOS EXTRAS:*\n`;
+        payload.extraItems.forEach(item => {
+            message += `↳ ${item.name} (Cant: ${item.quantity}) - Total item: $${item.total}\n`;
+        });
+        message += `\n`;
+    }
+
+    message += `🚚 *MÉTODO DE ENTREGA:*\n`;
+    if (payload.shipping.method === 'envio') {
+        message += `↳ Envío (Costo: $${payload.shipping.cost})\n\n`;
+    } else {
+        message += `↳ Retiro en Local\n\n`;
+    }
+
+    message += `💰 *PRESUPUESTO TOTAL: $${payload.total}*`;
+
+    try {
+        const response = await fetch(`${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': EVOLUTION_API_KEY!,
+            },
+            body: JSON.stringify({
+                number: VENDOR_WHATSAPP_NUMBER,
+                text: message,
+            }),
+        });
+
+        if (response.ok) {
+            return { success: true, message: "Order sent successfully." };
+        } else {
+            const errorData = await response.json();
+            console.error("Evolution API Error:", errorData);
+            return { success: false, error: "Failed to send order via API." };
+        }
+    } catch (error) {
+        console.error("Fetch Error:", error);
+        return { success: false, error: "Network error or API is down." };
+    }
+}
+
+export async function getAiSuggestions(product: Product): Promise<Extra[]> {
+    try {
+        const suggestions = await suggestComplementaryItems({ productName: product.name });
+        
+        const allExtras = [...extrasCatalog, ...products.filter(p => p.id !== product.id).map(p => ({...p, id: `p-${p.id}`, suggested: false}))];
+
+        const matchedExtras = suggestions.map(suggestion => {
+            const found = allExtras.find(extra => extra.name.toLowerCase().includes(suggestion.name.toLowerCase()));
+            if (found) {
+                return { ...found, description: suggestion.description, suggested: true };
+            }
+            return null;
+        }).filter((item): item is Extra => item !== null);
+
+        // Remove duplicates and limit to 3
+        const uniqueExtras = Array.from(new Map(matchedExtras.map(item => [item.id, item])).values());
+        
+        return uniqueExtras.slice(0, 3);
+    } catch (error) {
+        console.error("Error getting AI suggestions:", error);
+        // Fallback to default suggested items
+        return extrasCatalog.filter(e => e.suggested);
+    }
+}
+
+export async function getAiChatResponse(query: string, fullHistory: string): Promise<string> {
+    try {
+        const response = await aiChatAssistance({ query: `Full conversation history for context:\n${fullHistory}\n\nLatest user query: ${query}` });
+        return response.response;
+    } catch (error) {
+        console.error("Error getting AI chat response:", error);
+        return "Lo siento, estoy teniendo problemas para conectarme. Por favor, intenta de nuevo más tarde.";
+    }
+}
+
+export async function sendChatMessageToWhatsApp(text: string) {
+    if (!text) return { success: false, error: 'Message text is empty.' };
+
+     try {
+        const response = await fetch(`${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': EVOLUTION_API_KEY!,
+            },
+            body: JSON.stringify({
+                number: VENDOR_WHATSAPP_NUMBER,
+                text: text,
+            }),
+        });
+        
+        return { success: response.ok };
+    } catch (error) {
+        console.error("Error sending chat message:", error);
+        return { success: false };
+    }
+}

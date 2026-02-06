@@ -1,5 +1,5 @@
 'use client';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import type { LightboxContent } from '@/types';
 import Image from 'next/image';
 
@@ -12,6 +12,9 @@ type LightboxProps = {
 export function Lightbox({ isOpen, onClose, content }: LightboxProps) {
   if (!content) return null;
 
+  const title = content.type === 'image' ? 'Imagen Ampliada' : 'Video Ampliado';
+  const description = content.type === 'image' ? 'Una vista ampliada de la imagen del producto.' : 'Un video mostrando el producto.';
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent 
@@ -19,6 +22,8 @@ export function Lightbox({ isOpen, onClose, content }: LightboxProps) {
         onEscapeKeyDown={onClose}
         onPointerDownOutside={onClose}
       >
+        <DialogTitle className="sr-only">{title}</DialogTitle>
+        <DialogDescription className="sr-only">{description}</DialogDescription>
         <div className="relative w-full h-full max-w-5xl max-h-full" onClick={(e) => e.stopPropagation()}>
           {content.type === 'image' && (
             <Image 

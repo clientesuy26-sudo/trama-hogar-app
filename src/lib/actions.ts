@@ -69,14 +69,15 @@ export async function sendOrderToWhatsApp(payload: OrderPayload) {
     message += `💰 *PRESUPUESTO TOTAL: $${payload.total}*`;
     
     const destinationNumber = `${VENDOR_WHATSAPP_NUMBER}@c.us`;
+    const endpoint = `${EVOLUTION_API_URL}/${EVOLUTION_INSTANCE}/message/sendText`;
 
     logEvent('sendOrderToWhatsApp', 'info', 'Sending request to Evolution API.', {
-        url: `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`,
+        url: endpoint,
         number: destinationNumber,
     });
 
     try {
-        const response = await fetch(`${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -84,7 +85,7 @@ export async function sendOrderToWhatsApp(payload: OrderPayload) {
             },
             body: JSON.stringify({
                 number: destinationNumber,
-                text: message,
+                textMessage: { text: message },
             }),
         });
 
@@ -153,11 +154,12 @@ export async function sendChatMessageToWhatsApp(text: string) {
     }
     const fullMessage = `Consulta desde el Chat Widget: "${text}"`;
     const destinationNumber = `${VENDOR_WHATSAPP_NUMBER}@c.us`;
+    const endpoint = `${EVOLUTION_API_URL}/${EVOLUTION_INSTANCE}/message/sendText`;
 
-    logEvent('sendChatMessageToWhatsApp', 'info', 'Sending chat message to WhatsApp.', { text: fullMessage, number: destinationNumber });
+    logEvent('sendChatMessageToWhatsApp', 'info', 'Sending chat message to WhatsApp.', { text: fullMessage, number: destinationNumber, url: endpoint });
 
      try {
-        const response = await fetch(`${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -165,7 +167,7 @@ export async function sendChatMessageToWhatsApp(text: string) {
             },
             body: JSON.stringify({
                 number: destinationNumber,
-                text: fullMessage,
+                textMessage: { text: fullMessage },
             }),
         });
         

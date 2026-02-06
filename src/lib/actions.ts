@@ -2,7 +2,7 @@
 
 import { suggestComplementaryItems } from '@/ai/flows/suggest-complementary-items';
 import { aiChatAssistance } from '@/ai/flows/ai-chat-assistance';
-import type { Product, Extra, CartItem } from '@/types';
+import type { Product, Extra, CartItem, EvolutionMessage } from '@/types';
 import { products, extrasCatalog } from './data';
 import { z } from 'zod';
 import { logEvent } from './logger';
@@ -34,6 +34,22 @@ const OrderPayloadSchema = z.object({
 });
 
 type OrderPayload = z.infer<typeof OrderPayloadSchema>;
+
+const EvolutionMessageSchema = z.object({
+  key: z.object({
+    remoteJid: z.string(),
+    fromMe: z.boolean(),
+    id: z.string(),
+  }),
+  message: z.object({
+    conversation: z.string().optional(),
+    extendedTextMessage: z.object({
+      text: z.string(),
+    }).optional(),
+  }).nullable(),
+  messageTimestamp: z.number(),
+});
+const EvolutionMessagesResponseSchema = z.array(EvolutionMessageSchema);
 
 export async function sendOrderToWhatsApp(payload: OrderPayload) {
     try {
@@ -72,7 +88,13 @@ export async function sendOrderToWhatsApp(payload: OrderPayload) {
     
     const requestBody = {
         number: destinationNumber,
-        text: message,
+        options: {
+          delay: 1200,
+          presence: "composing",
+        },
+        textMessage: {
+            text: message,
+        }
     };
     const requestHeaders = {
         'Content-Type': 'application/json',
@@ -170,7 +192,13 @@ export async function sendChatMessageToWhatsApp(text: string): Promise<{ success
     const endpoint = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
     const requestBody = {
         number: destinationNumber,
-        text: fullMessage,
+        options: {
+          delay: 1200,
+          presence: "composing",
+        },
+        textMessage: {
+            text: fullMessage,
+        }
     };
     const requestHeaders = {
         'Content-Type': 'application/json',
@@ -202,7 +230,7 @@ export async function sendChatMessageToWhatsApp(text: string): Promise<{ success
             return { success: true };
         } else {
             const errorData = await response.json().catch(() => ({ message: 'Could not parse error response as JSON.' }));
-            const errorMessage = errorData?.message || JSON.stringify(errorData) ||'Unknown API error';
+            const errorMessage = errorData?.response?.message || JSON.stringify(errorData) ||'Unknown API error';
             logEvent('sendChatMessageToWhatsApp', 'error', 'Failed to send chat message.', { status: response.status, error: errorData });
             return { success: false, error: `API Error: ${errorMessage}` };
         }
@@ -211,5 +239,53 @@ export async function sendChatMessageToWhatsApp(text: string): Promise<{ success
         logEvent('sendChatMessageToWhatsApp', 'error', 'Network/Fetch error sending chat message.', { name: error.name, message: error.message, cause: error.cause });
         console.error("Error sending chat message:", error);
         return { success: false, error: `Network Error: ${error.message || 'Unknown error'}` };
+    }
+}
+
+export async function fetchNewWhatsAppMessages(): Promise<{ success: boolean, messages: EvolutionMessage[], error?: string }> {
+    const remoteJid = `${VENDOR_WHATSAPP_NUMBER}@s.whatsapp.net`;
+    const endpoint = `${EVOLUTION_API_URL}/chat/findMessages/${EVOLUTION_INSTANCE}`;
+    
+    const params = new URLSearchParams({
+        'where[key][remoteJid]': remoteJid,
+        'limit': '10',
+        'sort': 'desc'
+    });
+
+    const fullUrl = `${endpoint}?${params.toString()}`;
+
+    const requestHeaders = {
+        'apikey': EVOLUTION_API_KEY!,
+    };
+    
+    logEvent('fetchNewWhatsAppMessages', 'info', 'Fetching new messages from WhatsApp.', {
+        url: fullUrl,
+    });
+
+    try {
+        const response = await fetch(fullUrl, {
+            method: 'GET',
+            headers: requestHeaders,
+            cache: 'no-store',
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const validation = EvolutionMessagesResponseSchema.safeParse(data);
+            if (!validation.success) {
+                const error = validation.error.format();
+                logEvent('fetchNewWhatsAppMessages', 'error', 'Invalid message format from Evolution API.', { error });
+                return { success: false, messages: [], error: 'Invalid message format from API.' };
+            }
+            logEvent('fetchNewWhatsAppMessages', 'success', `Fetched ${validation.data.length} messages.`);
+            return { success: true, messages: validation.data };
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            logEvent('fetchNewWhatsAppMessages', 'error', 'Failed to fetch messages.', { status: response.status, error: errorData });
+            return { success: false, messages: [], error: `API Error: ${response.statusText}` };
+        }
+    } catch (error: any) {
+        logEvent('fetchNewWhatsAppMessages', 'error', 'Network/Fetch error fetching messages.', { message: error.message });
+        return { success: false, messages: [], error: `Network Error: ${error.message}` };
     }
 }

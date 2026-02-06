@@ -35,3 +35,18 @@ export interface ChatMessage {
   type: 'sent' | 'received';
   timestamp: number;
 }
+
+export interface EvolutionMessage {
+  key: {
+    remoteJid: string;
+    fromMe: boolean;
+    id: string;
+  };
+  message: {
+    conversation?: string;
+    extendedTextMessage?: {
+      text: string;
+    };
+  } | null;
+  messageTimestamp: number;
+}

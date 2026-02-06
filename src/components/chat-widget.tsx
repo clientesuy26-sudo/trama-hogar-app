@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Bot, X, SendHorizonal, LoaderCircle, Check, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ChatMessage } from '@/types';
-import { getAiChatResponse, sendChatMessageToWhatsApp } from '@/lib/actions';
+import type { ChatMessage, EvolutionMessage } from '@/types';
+import { getAiChatResponse, sendChatMessageToWhatsApp, fetchNewWhatsAppMessages } from '@/lib/actions';
 import { logEvent } from '@/lib/logger';
 
 type ChatWidgetProps = {
@@ -21,6 +21,13 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
     const [inputValue, setInputValue] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
+    const [hasNewMessage, setHasNewMessage] = useState(false);
+    const processedMessageIds = useRef(new Set<string>());
+    const isOpenRef = useRef(isOpen);
+
+    useEffect(() => {
+        isOpenRef.current = isOpen;
+    }, [isOpen]);
 
     const scrollToBottom = useCallback(() => {
         setTimeout(() => {
@@ -33,8 +40,49 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
         }, 100);
     }, []);
 
+    const handleNewMessages = useCallback((fetchedMessages: EvolutionMessage[]) => {
+        const newChatMessages: ChatMessage[] = [];
+        
+        fetchedMessages.slice().reverse().forEach(msg => {
+            if (!msg.key.fromMe && msg.message && !processedMessageIds.current.has(msg.key.id)) {
+                const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
+                if (text) {
+                    newChatMessages.push({
+                        id: msg.key.id,
+                        text: text,
+                        type: 'received',
+                        timestamp: msg.messageTimestamp * 1000
+                    });
+                    processedMessageIds.current.add(msg.key.id);
+                }
+            }
+        });
+
+        if (newChatMessages.length > 0) {
+            if (!isOpenRef.current) {
+                setHasNewMessage(true);
+            }
+            setMessages(prev => [...prev, ...newChatMessages]);
+        }
+    }, []);
+    
+    useEffect(() => {
+        const poll = async () => {
+            const result = await fetchNewWhatsAppMessages();
+            if (result.success && result.messages.length > 0) {
+                handleNewMessages(result.messages);
+            }
+        };
+
+        const intervalId = setInterval(poll, 5000);
+        poll(); // Initial poll
+
+        return () => clearInterval(intervalId);
+    }, [handleNewMessages]);
+
     useEffect(() => {
         if (isOpen) {
+            setHasNewMessage(false);
             const welcomeMessage: ChatMessage = {
                 id: 'welcome',
                 text: '¡Hola! Soy Maya de Trama Hogar. ¿En qué puedo ayudarte con tu presupuesto hoy? 👋',
@@ -43,6 +91,7 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
             };
             if(messages.length === 0) {
               setMessages([welcomeMessage]);
+              processedMessageIds.current.add(welcomeMessage.id);
             }
 
             if (initialMessage) {
@@ -52,13 +101,14 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
                     type: 'sent',
                     timestamp: Date.now()
                 };
+                processedMessageIds.current.add(orderMessage.id);
                 setMessages(prev => [...prev, orderMessage]);
                 handleAiResponse(initialMessage, [welcomeMessage, orderMessage]);
                 clearInitialMessage();
             }
             scrollToBottom();
         }
-    }, [isOpen, initialMessage]);
+    }, [isOpen, initialMessage, clearInitialMessage, handleNewMessages]);
 
     useEffect(() => {
         scrollToBottom();
@@ -75,6 +125,7 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
             type: 'received',
             timestamp: Date.now()
         };
+        processedMessageIds.current.add(aiMessage.id);
         setMessages(prev => [...prev, aiMessage]);
         setIsTyping(false);
     };
@@ -90,6 +141,7 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
             type: 'sent',
             timestamp: Date.now()
         };
+        processedMessageIds.current.add(userMessage.id);
 
         const newMessages = [...messages, userMessage];
         setMessages(newMessages);
@@ -114,6 +166,12 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
             >
                 <Bot className="mr-2 h-6 w-6"/>
                 <span className="font-bold tracking-wide">Habla con Maya</span>
+                 {hasNewMessage && (
+                    <span className="absolute top-1 right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                )}
             </Button>
         );
     }

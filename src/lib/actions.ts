@@ -151,7 +151,7 @@ export async function sendChatMessageToWhatsApp(text: string, senderName: string
 
 export async function fetchNewWhatsAppMessages(): Promise<{ success: boolean, messages: ChatMessage[], error?: string }> {
     try {
-        const messages = getAndClearMessages();
+        const messages = await getAndClearMessages();
         if (messages.length > 0) {
             logEvent('fetchNewWhatsAppMessages', 'success', `Fetched ${messages.length} new messages from store.`);
         }

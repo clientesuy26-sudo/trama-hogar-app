@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
         status: 'delivered',
       };
       
-      addMessage(message);
+      await addMessage(message);
 
       return NextResponse.json({ success: true, message: 'Message processed.' });
     }

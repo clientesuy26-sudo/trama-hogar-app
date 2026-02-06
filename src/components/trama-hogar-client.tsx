@@ -9,7 +9,6 @@ import { ProductSection } from '@/components/product-section';
 import { PurchaseModal } from '@/components/purchase-modal';
 import { Lightbox } from '@/components/lightbox';
 import { ChatWidget } from '@/components/chat-widget';
-import { DevLogger } from './dev-logger';
 
 export function TramaHogarClient() {
   const [isPurchaseModalOpen, setPurchaseModalOpen] = useState(false);
@@ -89,7 +88,6 @@ export function TramaHogarClient() {
         initialMessage={initialOrderMessage}
         clearInitialMessage={() => setInitialOrderMessage('')}
       />
-      <DevLogger />
     </div>
   );
 }

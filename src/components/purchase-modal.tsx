@@ -30,7 +30,7 @@ type PurchaseModalProps = {
 
 const FormSchema = z.object({
   name: z.string().min(2, { message: 'El nombre es requerido.' }),
-  whatsapp: z.string().regex(/^\d{8,12}$/, { message: 'Ingresa un WhatsApp válido (solo números, entre 8 y 12 dígitos).' }),
+  whatsapp: z.string().regex(/^(?:\+?598)?(09\d{7}|\d{8})$/, { message: 'Ingresa un WhatsApp válido de Uruguay (ej: 099123456).' }),
   barrio: z.string().min(3, { message: 'El barrio es requerido.' }),
 });
 
@@ -135,7 +135,7 @@ export function PurchaseModal({ isOpen, onClose, product, onOpenLightbox, onSend
     
     if (result.success) {
       logEvent('PurchaseModal', 'success', 'Order sent successfully.', payload);
-      const orderMessage = `He realizado un pedido de presupuesto para: ${mainQty}x ${product.name}. Total: $${totalPrice}.`;
+      const orderMessage = result.orderMessage || `He realizado un pedido de presupuesto para: ${mainQty}x ${product.name}. Total: $${totalPrice}.`;
       onSendOrder(orderMessage);
       toast({ title: "Pedido enviado", description: "Tu presupuesto ha sido enviado a Maya. Revisa el chat." });
     } else {

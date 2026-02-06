@@ -79,7 +79,10 @@ export async function sendOrderToWhatsApp(payload: OrderPayload) {
 
     message += `💰 *PRESUPUESTO TOTAL: $${payload.total}*`;
     
-    return await sendChatMessageToWhatsApp(message, 'Pedido de Presupuesto', customerInfo);
+    const sendResult = await sendChatMessageToWhatsApp(message, 'Pedido de Presupuesto', customerInfo);
+    
+    // Return the formatted message along with the result
+    return { ...sendResult, orderMessage: message };
 }
 
 export async function getAiSuggestions(product: Product): Promise<Extra[]> {

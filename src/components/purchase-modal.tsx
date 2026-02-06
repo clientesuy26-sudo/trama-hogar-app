@@ -13,6 +13,7 @@ import { SuggestionItem } from './suggestion-item';
 import { X, Truck, Store, Bot, LoaderCircle, ZoomIn } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { logEvent } from '@/lib/logger';
 
 type PurchaseModalProps = {
   isOpen: boolean;
@@ -101,13 +102,16 @@ export function PurchaseModal({ isOpen, onClose, product, onOpenLightbox, onSend
       total: totalPrice
     };
     
+    logEvent('PurchaseModal', 'info', 'Attempting to send order.', payload);
     const result = await sendOrderToWhatsApp(payload);
     
     if (result.success) {
+      logEvent('PurchaseModal', 'success', 'Order sent successfully.', payload);
       const orderMessage = `He realizado un pedido de presupuesto para: ${mainQty}x ${product.name}. Total: $${totalPrice}.`;
       onSendOrder(orderMessage);
       toast({ title: "Pedido enviado", description: "Tu presupuesto ha sido enviado a Maya. Revisa el chat." });
     } else {
+      logEvent('PurchaseModal', 'error', 'Error sending order.', { error: result.error, payload });
       toast({ variant: "destructive", title: "Error", description: result.error || "No se pudo enviar el pedido. Intenta de nuevo." });
     }
     

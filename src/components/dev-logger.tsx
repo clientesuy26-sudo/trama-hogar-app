@@ -57,7 +57,7 @@ export function DevLogger() {
   return (
     <div className="fixed bottom-6 left-6 w-[calc(100vw-3rem)] sm:w-[450px] h-[40vh] bg-neutral-900/90 backdrop-blur-sm text-white rounded-lg shadow-2xl flex flex-col overflow-hidden border border-neutral-700 z-50">
       <div className="p-2 border-b border-neutral-700 flex justify-between items-center bg-neutral-800">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-2"><Bug className="w-4 h-4"/><span>Maya Chat - Dev Log</span></h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-2"><Bug className="w-4 h-4"/><span>REAL-TIME EVENT LOG</span></h3>
         <div>
           <Button variant="ghost" size="icon" className="w-7 h-7 text-neutral-400 hover:bg-neutral-700" onClick={() => setLogs([])}>
             <Trash2 className="h-4 w-4" />

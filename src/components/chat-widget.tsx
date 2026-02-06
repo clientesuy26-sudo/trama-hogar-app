@@ -7,6 +7,7 @@ import { Bot, X, SendHorizonal, LoaderCircle, Check, Circle } from 'lucide-react
 import { cn } from '@/lib/utils';
 import type { ChatMessage } from '@/types';
 import { getAiChatResponse, sendChatMessageToWhatsApp } from '@/lib/actions';
+import { logEvent } from '@/lib/logger';
 
 type ChatWidgetProps = {
     isOpen: boolean;
@@ -94,7 +95,14 @@ export function ChatWidget({ isOpen, onToggle, initialMessage, clearInitialMessa
         setMessages(newMessages);
         setInputValue('');
 
-        await sendChatMessageToWhatsApp(text);
+        logEvent('ChatWidget', 'info', 'Sending message to WhatsApp...', { text });
+        const result = await sendChatMessageToWhatsApp(text);
+        if (result.success) {
+            logEvent('ChatWidget', 'success', 'Message sent to WhatsApp successfully.');
+        } else {
+            logEvent('ChatWidget', 'error', 'Failed to send message to WhatsApp.', { error: result.error });
+        }
+
         await handleAiResponse(text, newMessages);
     };
 

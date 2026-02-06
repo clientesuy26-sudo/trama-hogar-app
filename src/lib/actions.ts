@@ -69,7 +69,7 @@ export async function sendOrderToWhatsApp(payload: OrderPayload) {
     message += `💰 *PRESUPUESTO TOTAL: $${payload.total}*`;
     
     const destinationNumber = `${VENDOR_WHATSAPP_NUMBER}@c.us`;
-    const endpoint = `${EVOLUTION_API_URL}/${EVOLUTION_INSTANCE}/message/sendText`;
+    const endpoint = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
 
     logEvent('sendOrderToWhatsApp', 'info', 'Sending request to Evolution API.', {
         url: endpoint,
@@ -147,14 +147,14 @@ export async function getAiChatResponse(query: string, fullHistory: string): Pro
     }
 }
 
-export async function sendChatMessageToWhatsApp(text: string) {
+export async function sendChatMessageToWhatsApp(text: string): Promise<{ success: boolean; error?: string }> {
     if (!text) {
         logEvent('sendChatMessageToWhatsApp', 'error', 'Message text is empty.');
         return { success: false, error: 'Message text is empty.' };
     }
     const fullMessage = `Consulta desde el Chat Widget: "${text}"`;
     const destinationNumber = `${VENDOR_WHATSAPP_NUMBER}@c.us`;
-    const endpoint = `${EVOLUTION_API_URL}/${EVOLUTION_INSTANCE}/message/sendText`;
+    const endpoint = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
 
     logEvent('sendChatMessageToWhatsApp', 'info', 'Sending chat message to WhatsApp.', { text: fullMessage, number: destinationNumber, url: endpoint });
 
@@ -173,15 +173,17 @@ export async function sendChatMessageToWhatsApp(text: string) {
         
         if (response.ok) {
             logEvent('sendChatMessageToWhatsApp', 'success', 'Chat message sent successfully.');
+            return { success: true };
         } else {
             const errorData = await response.json();
+            const errorMessage = errorData?.message || 'Unknown API error';
             logEvent('sendChatMessageToWhatsApp', 'error', 'Error sending chat message.', { status: response.status, errorData });
+            return { success: false, error: `API Error: ${errorMessage}` };
         }
         
-        return { success: response.ok };
-    } catch (error) {
+    } catch (error: any) {
         logEvent('sendChatMessageToWhatsApp', 'error', 'Fetch error sending chat message.', error);
         console.error("Error sending chat message:", error);
-        return { success: false };
+        return { success: false, error: `Network Error: ${error.message || 'Unknown error'}` };
     }
 }
